@@ -1,0 +1,76 @@
+{
+  "strategy": "zero_shot",
+  "prompt_prefix": "-- Hike Tracker schema (SQLite)\nPRAGMA foreign_keys = ON;\n\nCREATE TABLE park (\n    park_id   INTEGER PRIMARY KEY,\n    name      TEXT NOT NULL,\n    state     TEXT,\n    park_type TEXT CHECK (park_type IN ('national park', 'state park', 'national forest',\n                                        'national monument', 'recreation area', 'other'))\n);\n\nCREATE TABLE trail (\n    trail_id          INTEGER PRIMARY KEY,\n    park_id           INTEGER NOT NULL,\n    name              TEXT NOT NULL,\n    length_miles      REAL,\n    elevation_gain_ft INTEGER,\n    difficulty        TEXT CHECK (difficulty IN ('easy', 'moderate', 'hard', 'strenuous')),\n    route_type        TEXT CHECK (route_type IN ('loop', 'out-and-back', 'point-to-point')),\n    FOREIGN KEY (park_id) REFERENCES park(park_id)\n);\n\nCREATE TABLE hike (\n    hike_id          INTEGER PRIMARY KEY,\n    trail_id         INTEGER NOT NULL,\n    hike_date        DATE NOT NULL,\n    duration_minutes INTEGER,\n    weather          TEXT,\n    notes            TEXT,\n    FOREIGN KEY (trail_id) REFERENCES trail(trail_id)\n);\n\nCREATE TABLE sighting (\n    sighting_id INTEGER PRIMARY KEY,\n    hike_id     INTEGER NOT NULL,\n    species     TEXT NOT NULL,\n    count       INTEGER DEFAULT 1,\n    FOREIGN KEY (hike_id) REFERENCES hike(hike_id)\n);\n\nCREATE TABLE hiker (\n    hiker_id  INTEGER PRIMARY KEY,\n    name      TEXT NOT NULL,\n    email     TEXT,\n    home_city TEXT\n);\n\nCREATE TABLE hike_participant (\n    hike_id  INTEGER NOT NULL,\n    hiker_id INTEGER NOT NULL,\n    rating   INTEGER CHECK (rating BETWEEN 1 AND 5),\n    PRIMARY KEY (hike_id, hiker_id),\n    FOREIGN KEY (hike_id) REFERENCES hike(hike_id),\n    FOREIGN KEY (hiker_id) REFERENCES hiker(hiker_id)\n);\n\nCREATE TABLE gear (\n    gear_id       INTEGER PRIMARY KEY,\n    owner_id      INTEGER NOT NULL,\n    name          TEXT NOT NULL,\n    category      TEXT CHECK (category IN ('pack', 'footwear', 'clothing', 'rain gear', 'shelter',\n                                           'sleep', 'navigation', 'water', 'lighting', 'safety',\n                                           'cooking', 'trekking poles')),\n    brand         TEXT,\n    weight_oz     REAL,\n    purchase_date DATE,\n    FOREIGN KEY (owner_id) REFERENCES hiker(hiker_id)\n);\n\nCREATE TABLE hike_gear (\n    hike_id INTEGER NOT NULL,\n    gear_id INTEGER NOT NULL,\n    PRIMARY KEY (hike_id, gear_id),\n    FOREIGN KEY (hike_id) REFERENCES hike(hike_id),\n    FOREIGN KEY (gear_id) REFERENCES gear(gear_id)\n); Today's date is 2026-10-09. Give me a sqlite select statement that answers the question. Only respond with sqlite syntax. If there is an error do not explain it!",
+  "questionResults": [
+    {
+      "question": "Who has gone on the most hikes?",
+      "sql": "SELECT h.name, COUNT(hp.hike_id) AS hike_count\nFROM hiker h\nJOIN hike_participant hp ON h.hiker_id = hp.hiker_id\nGROUP BY h.name\nORDER BY hike_count DESC\nLIMIT 1;",
+      "queryRawResponse": "[('Maya Chen', 8)]",
+      "friendlyResponse": "The person who has gone on the most hikes is Maya Chen, with a total of 8 hikes. Happy hiking, Maya!",
+      "error": "None"
+    },
+    {
+      "question": "Which trails in Zion are rated strenuous?",
+      "sql": "SELECT t.name\nFROM trail t\nJOIN park p ON t.park_id = p.park_id\nWHERE p.name = 'Zion' AND t.difficulty = 'strenuous';",
+      "queryRawResponse": "[]",
+      "friendlyResponse": "It looks like there are no trails in Zion that are currently rated as strenuous according to the data. If you have any other questions about trails or parks, feel free to ask!",
+      "error": "None"
+    },
+    {
+      "question": "What is the average rating for each park?",
+      "sql": "SELECT p.name, AVG(hp.rating) AS average_rating\nFROM park p\nJOIN trail t ON p.park_id = t.park_id\nJOIN hike h ON t.trail_id = h.trail_id\nJOIN hike_participant hp ON h.hike_id = hp.hike_id\nGROUP BY p.park_id, p.name;",
+      "queryRawResponse": "[('Zion National Park', 4.25), ('Arches National Park', 4.6), ('Bryce Canyon National Park', 4.5), ('Uinta-Wasatch-Cache National Forest', 3.9166666666666665), ('Timpanogos Cave National Monument', 3.0)]",
+      "friendlyResponse": "Based on the available data, Arches National Park has the highest average rating with a score of 4.6, while Timpanogos Cave National Monument has the lowest with an average rating of 3.0. The other parks have average ratings ranging between 3.92 and 4.5.",
+      "error": "None"
+    },
+    {
+      "question": "Which hikes happened in the rain?",
+      "sql": "SELECT h.hike_id, h.trail_id, h.hike_date, h.duration_minutes, h.weather, h.notes\nFROM hike h\nWHERE h.weather LIKE '%rain%';",
+      "queryRawResponse": "[(5, 3, '2026-03-22', 70, 'light rain', 'Easy recovery hike after Angels Landing'), (14, 9, '2026-10-03', 125, 'rainy and muddy', 'Fall colors were peaking')]",
+      "friendlyResponse": "Two hikes happened in the rain: one on March 22, 2026, which lasted 70 minutes with light rain, and another on October 3, 2026, which lasted 125 minutes in rainy and muddy conditions. Enjoy the adventures!",
+      "error": "None"
+    },
+    {
+      "question": "Did anyone bring rain gear on a rainy hike?",
+      "sql": "SELECT DISTINCT hiker.name\nFROM hike\nJOIN hike_gear ON hike.hike_id = hike_gear.hike_id\nJOIN gear ON hike_gear.gear_id = gear.gear_id\nJOIN hiker ON gear.owner_id = hiker.hiker_id\nWHERE hike.weather LIKE '%rain%'\nAND gear.category = 'rain gear';",
+      "queryRawResponse": "[('Maya Chen',)]",
+      "friendlyResponse": "Yes, Maya Chen brought rain gear on the rainy hike. Make sure to follow her example for a comfy hike!",
+      "error": "None"
+    },
+    {
+      "question": "Whose gear went on a hike they didn't go on?",
+      "sql": "SELECT DISTINCT g.owner_id\nFROM hike_gear hg\nJOIN gear g ON hg.gear_id = g.gear_id\nWHERE g.owner_id NOT IN (\n    SELECT hp.hiker_id\n    FROM hike_participant hp\n    WHERE hp.hike_id = hg.hike_id\n);",
+      "queryRawResponse": "[(4,), (5,)]",
+      "friendlyResponse": "It looks like the gear belonging to owners with IDs 4 and 5 went on a hike that they didn't participate in. Hope that helps!",
+      "error": "None"
+    },
+    {
+      "question": "Did anyone see a bear, and did they have bear spray?",
+      "sql": "SELECT \n    s.hike_id\nFROM \n    sighting AS s\nJOIN \n    hike_gear AS hg ON s.hike_id = hg.hike_id\nJOIN \n    gear AS g ON hg.gear_id = g.gear_id\nWHERE \n    s.species = 'bear' AND g.name = 'bear spray';",
+      "queryRawResponse": "[]",
+      "friendlyResponse": "No one who saw a bear had bear spray during their hike, as the data doesn't show any matches. Stay safe and consider packing some for your next adventure!",
+      "error": "None"
+    },
+    {
+      "question": "What gear has never been used on a hike?",
+      "sql": "SELECT g.gear_id, g.name\nFROM gear g\nLEFT JOIN hike_gear hg ON g.gear_id = hg.gear_id\nWHERE hg.gear_id IS NULL;",
+      "queryRawResponse": "[(13, 'Atmos AG 65 backpack'), (15, 'PocketRocket stove')]",
+      "friendlyResponse": "It looks like the 'Atmos AG 65 backpack' and the 'PocketRocket stove' have never been used on a hike. Happy hiking!",
+      "error": "None"
+    },
+    {
+      "question": "What is the hardest trail?",
+      "sql": "SELECT name FROM trail WHERE difficulty = 'strenuous';",
+      "queryRawResponse": "[('Angels Landing',), ('Fairyland Loop',), ('Mount Timpanogos (Timpooneke to Aspen Grove)',)]",
+      "friendlyResponse": "Based on the data, some of the hardest trails are Angels Landing, Fairyland Loop, and Mount Timpanogos (Timpooneke to Aspen Grove). Happy hiking, and remember to stay safe on those strenuous paths!",
+      "error": "None"
+    },
+    {
+      "question": "Which trail has nobody hiked yet?",
+      "sql": "SELECT trail.name\nFROM trail\nLEFT JOIN hike ON trail.trail_id = hike.trail_id\nWHERE hike.hike_id IS NULL;",
+      "queryRawResponse": "[('Petrified Dunes',)]",
+      "friendlyResponse": "The trail \"Petrified Dunes\" is the one that hasn't been hiked yet. Looks like it's waiting for its first adventurer!",
+      "error": "None"
+    }
+  ]
+}

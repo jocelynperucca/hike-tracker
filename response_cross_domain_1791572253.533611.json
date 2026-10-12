@@ -1,0 +1,76 @@
+{
+  "strategy": "cross_domain",
+  "prompt_prefix": "Here is an example from a different database. Schema: CREATE TABLE person (person_id INTEGER PRIMARY KEY, name TEXT); CREATE TABLE phone (phone_id INTEGER PRIMARY KEY, person_id INTEGER, can_recieve_sms INTEGER); Question: Who doesn't have a way for us to text them? \nSELECT p.person_id, p.name\nFROM person p\nLEFT JOIN phone ph ON p.person_id = ph.person_id AND ph.can_recieve_sms = 1\nWHERE ph.phone_id IS NULL;\nNow here is my actual database: -- Hike Tracker schema (SQLite)\nPRAGMA foreign_keys = ON;\n\nCREATE TABLE park (\n    park_id   INTEGER PRIMARY KEY,\n    name      TEXT NOT NULL,\n    state     TEXT,\n    park_type TEXT CHECK (park_type IN ('national park', 'state park', 'national forest',\n                                        'national monument', 'recreation area', 'other'))\n);\n\nCREATE TABLE trail (\n    trail_id          INTEGER PRIMARY KEY,\n    park_id           INTEGER NOT NULL,\n    name              TEXT NOT NULL,\n    length_miles      REAL,\n    elevation_gain_ft INTEGER,\n    difficulty        TEXT CHECK (difficulty IN ('easy', 'moderate', 'hard', 'strenuous')),\n    route_type        TEXT CHECK (route_type IN ('loop', 'out-and-back', 'point-to-point')),\n    FOREIGN KEY (park_id) REFERENCES park(park_id)\n);\n\nCREATE TABLE hike (\n    hike_id          INTEGER PRIMARY KEY,\n    trail_id         INTEGER NOT NULL,\n    hike_date        DATE NOT NULL,\n    duration_minutes INTEGER,\n    weather          TEXT,\n    notes            TEXT,\n    FOREIGN KEY (trail_id) REFERENCES trail(trail_id)\n);\n\nCREATE TABLE sighting (\n    sighting_id INTEGER PRIMARY KEY,\n    hike_id     INTEGER NOT NULL,\n    species     TEXT NOT NULL,\n    count       INTEGER DEFAULT 1,\n    FOREIGN KEY (hike_id) REFERENCES hike(hike_id)\n);\n\nCREATE TABLE hiker (\n    hiker_id  INTEGER PRIMARY KEY,\n    name      TEXT NOT NULL,\n    email     TEXT,\n    home_city TEXT\n);\n\nCREATE TABLE hike_participant (\n    hike_id  INTEGER NOT NULL,\n    hiker_id INTEGER NOT NULL,\n    rating   INTEGER CHECK (rating BETWEEN 1 AND 5),\n    PRIMARY KEY (hike_id, hiker_id),\n    FOREIGN KEY (hike_id) REFERENCES hike(hike_id),\n    FOREIGN KEY (hiker_id) REFERENCES hiker(hiker_id)\n);\n\nCREATE TABLE gear (\n    gear_id       INTEGER PRIMARY KEY,\n    owner_id      INTEGER NOT NULL,\n    name          TEXT NOT NULL,\n    category      TEXT CHECK (category IN ('pack', 'footwear', 'clothing', 'rain gear', 'shelter',\n                                           'sleep', 'navigation', 'water', 'lighting', 'safety',\n                                           'cooking', 'trekking poles')),\n    brand         TEXT,\n    weight_oz     REAL,\n    purchase_date DATE,\n    FOREIGN KEY (owner_id) REFERENCES hiker(hiker_id)\n);\n\nCREATE TABLE hike_gear (\n    hike_id INTEGER NOT NULL,\n    gear_id INTEGER NOT NULL,\n    PRIMARY KEY (hike_id, gear_id),\n    FOREIGN KEY (hike_id) REFERENCES hike(hike_id),\n    FOREIGN KEY (gear_id) REFERENCES gear(gear_id)\n); Today's date is 2026-10-09. Give me a sqlite select statement that answers the question. Only respond with sqlite syntax. If there is an error do not explain it!",
+  "questionResults": [
+    {
+      "question": "Who has gone on the most hikes?",
+      "sql": "SELECT hp.hiker_id, h.name, COUNT(*) AS hike_count\nFROM hike_participant hp\nJOIN hiker h ON hp.hiker_id = h.hiker_id\nGROUP BY hp.hiker_id\nORDER BY hike_count DESC\nLIMIT 1;",
+      "queryRawResponse": "[(1, 'Maya Chen', 8)]",
+      "friendlyResponse": "The person who has gone on the most hikes is Maya Chen, with a total of 8 hikes. Happy trails!",
+      "error": "None"
+    },
+    {
+      "question": "Which trails in Zion are rated strenuous?",
+      "sql": "SELECT t.trail_id, t.name\nFROM trail t\nJOIN park p ON t.park_id = p.park_id\nWHERE p.name = 'Zion'\nAND t.difficulty = 'strenuous';",
+      "queryRawResponse": "[]",
+      "friendlyResponse": "It looks like there are currently no trails rated as strenuous in Zion according to the data we have. Let me know if there's anything else you need!",
+      "error": "None"
+    },
+    {
+      "question": "What is the average rating for each park?",
+      "sql": "SELECT pk.park_id, pk.name, AVG(hp.rating) AS average_rating\nFROM park pk\nJOIN trail tr ON pk.park_id = tr.park_id\nJOIN hike h ON tr.trail_id = h.trail_id\nJOIN hike_participant hp ON h.hike_id = hp.hike_id\nGROUP BY pk.park_id, pk.name;",
+      "queryRawResponse": "[(1, 'Zion National Park', 4.25), (2, 'Arches National Park', 4.6), (3, 'Bryce Canyon National Park', 4.5), (4, 'Uinta-Wasatch-Cache National Forest', 3.9166666666666665), (6, 'Timpanogos Cave National Monument', 3.0)]",
+      "friendlyResponse": "Based on the data, Zion National Park has an average rating of 4.25, Arches National Park has 4.6, Bryce Canyon National Park has 4.5, Uinta-Wasatch-Cache National Forest has approximately 3.92, and Timpanogos Cave National Monument has 3.0. Enjoy exploring these beautiful parks!",
+      "error": "None"
+    },
+    {
+      "question": "Which hikes happened in the rain?",
+      "sql": "SELECT h.hike_id, h.hike_date, t.name AS trail_name\nFROM hike h\nJOIN trail t ON h.trail_id = t.trail_id\nWHERE h.weather LIKE '%rain%';",
+      "queryRawResponse": "[(5, '2026-03-22', 'Riverside Walk'), (14, '2026-10-03', 'Stewart Falls')]",
+      "friendlyResponse": "Sure! The hikes that happened in the rain were the Riverside Walk on March 22, 2026, and Stewart Falls on October 3, 2026. Stay dry on your next adventure!",
+      "error": "None"
+    },
+    {
+      "question": "Did anyone bring rain gear on a rainy hike?",
+      "sql": "SELECT DISTINCT h.name\nFROM hike h\nJOIN hike_gear hg ON h.hike_id = hg.hike_id\nJOIN gear g ON hg.gear_id = g.gear_id\nWHERE h.weather LIKE '%rain%' AND g.category = 'rain gear';",
+      "queryRawResponse": "",
+      "friendlyResponse": "",
+      "error": "no such column: h.name"
+    },
+    {
+      "question": "Whose gear went on a hike they didn't go on?",
+      "sql": "SELECT DISTINCT g.owner_id\nFROM gear g\nJOIN hike_gear hg ON g.gear_id = hg.gear_id\nLEFT JOIN hike_participant hp ON hg.hike_id = hp.hike_id AND g.owner_id = hp.hiker_id\nWHERE hp.hiker_id IS NULL;",
+      "queryRawResponse": "[(4,), (5,)]",
+      "friendlyResponse": "It looks like gear belonging to the owners with IDs 4 and 5 went on a hike that they themselves didn't participate in. Quite an adventure for their gear!",
+      "error": "None"
+    },
+    {
+      "question": "Did anyone see a bear, and did they have bear spray?",
+      "sql": "SELECT DISTINCT h.name\nFROM sighting s\nJOIN hike h1 ON s.hike_id = h1.hike_id\nJOIN hike_participant hp ON h1.hike_id = hp.hike_id\nJOIN hiker h ON hp.hiker_id = h.hiker_id\nJOIN hike_gear hg ON h1.hike_id = hg.hike_id\nJOIN gear g ON hg.gear_id = g.gear_id\nWHERE s.species = 'bear' AND g.name = 'bear spray';",
+      "queryRawResponse": "[]",
+      "friendlyResponse": "No one saw a bear and had bear spray, according to the available data.",
+      "error": "None"
+    },
+    {
+      "question": "What gear has never been used on a hike?",
+      "sql": "SELECT g.gear_id, g.name\nFROM gear g\nLEFT JOIN hike_gear hg ON g.gear_id = hg.gear_id\nWHERE hg.hike_id IS NULL;",
+      "queryRawResponse": "[(13, 'Atmos AG 65 backpack'), (15, 'PocketRocket stove')]",
+      "friendlyResponse": "It looks like the \"Atmos AG 65 backpack\" and the \"PocketRocket stove\" have never been used on a hike. These items might be ready for their first adventure!",
+      "error": "None"
+    },
+    {
+      "question": "What is the hardest trail?",
+      "sql": "SELECT t.trail_id, t.name\nFROM trail t\nWHERE t.difficulty = 'strenuous';",
+      "queryRawResponse": "[(1, 'Angels Landing'), (7, 'Fairyland Loop'), (8, 'Mount Timpanogos (Timpooneke to Aspen Grove)')]",
+      "friendlyResponse": "The hardest trails based on their strenuous difficulty are Angels Landing, Fairyland Loop, and Mount Timpanogos (Timpooneke to Aspen Grove). Enjoy the challenge if you decide to take on any of these trails!",
+      "error": "None"
+    },
+    {
+      "question": "Which trail has nobody hiked yet?",
+      "sql": "SELECT t.trail_id, t.name\nFROM trail t\nLEFT JOIN hike h ON t.trail_id = h.trail_id\nWHERE h.hike_id IS NULL;",
+      "queryRawResponse": "[(11, 'Petrified Dunes')]",
+      "friendlyResponse": "The trail named \"Petrified Dunes\" has not been hiked by anyone yet. Happy exploring if you decide to be the first!",
+      "error": "None"
+    }
+  ]
+}
